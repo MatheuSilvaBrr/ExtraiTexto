@@ -1,190 +1,119 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import { User } from '@supabase/supabase-js';
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  ReactNode,
+} from 'react';
 import { supabase } from '../lib/supabase';
+import { Session, User } from '@supabase/supabase-js';
 import { toast } from 'react-hot-toast';
 
+// Interface que define o formato do nosso contexto de autenticação
 interface AuthContextType {
+  session: Session | null;
   user: User | null;
   loading: boolean;
-  signUp: (email: string, password: string, name: string) => Promise<void>;
-  signIn: (email: string, password: string) => Promise<void>;
-  signInWithGoogle: () => Promise<void>;
-  signInWithGithub: () => Promise<void>;
+  login: (email: string, password: string) => Promise<void>; // <-- Adicionado
+  signUp: (email: string, password: string, name: string) => Promise<void>; // <-- Adicionado
   signOut: () => Promise<void>;
-  resendVerificationEmail: () => Promise<void>;
-  resetPassword: (email: string) => Promise<void>;
-  updatePassword: (newPassword: string) => Promise<void>;
 }
 
+// Cria o contexto com o tipo definido acima
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+// Componente Provedor que vai envolver nossa aplicação
+export const AuthProvider = ({ children }: { children: ReactNode }) => {
+  const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    setLoading(true);
+    // Pega a sessão ativa ao carregar a página
     supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    // Escuta por mudanças no estado de autenticação (login, logout)
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
     });
 
+    // Limpa a inscrição quando o componente for desmontado
     return () => subscription.unsubscribe();
   }, []);
 
+  // Função de Login
+  const login = async (email: string, password: string) => {
+    console.log('3. Função login do AuthContext foi executada.'); // RASTRO 3
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      if (error) throw error;
+    } catch (error: any) {
+      if (error.message.includes('Invalid login credentials')) {
+        throw new Error('Email ou senha inválidos.');
+      }
+      throw error;
+    }
+  };
+
+  // Função de Cadastro
   const signUp = async (email: string, password: string, name: string) => {
     try {
       const { error } = await supabase.auth.signUp({
         email,
         password,
-        options: {
-          data: { name },
-          emailRedirectTo: `${window.location.origin}/auth/callback`
-        }
+        options: { data: { full_name: name } },
       });
-
       if (error) throw error;
-      toast.success('Verifique seu email para confirmar o cadastro!');
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.message?.includes('User already registered')) {
+        const customError = 'Este email já está cadastrado.';
+        toast.error(customError);
+        throw new Error(customError);
+      }
       toast.error('Erro ao criar conta. Tente novamente.');
       throw error;
     }
   };
 
-  const signIn = async (email: string, password: string) => {
-    try {
-      const { error, data } = await supabase.auth.signInWithPassword({
-        email,
-        password
-      });
-
-      if (error) throw error;
-
-      if (!data.user?.email_confirmed_at) {
-        toast.error('Por favor, verifique seu email antes de fazer login.');
-        await signOut();
-        return;
-      }
-
-      toast.success('Login realizado com sucesso!');
-    } catch (error) {
-      toast.error('Email ou senha incorretos.');
-      throw error;
-    }
-  };
-
-  const signInWithGoogle = async () => {
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`
-        }
-      });
-      
-      if (error) throw error;
-    } catch (error) {
-      toast.error('Erro ao fazer login com Google.');
-      throw error;
-    }
-  };
-
-  const signInWithGithub = async () => {
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'github',
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`
-        }
-      });
-      
-      if (error) throw error;
-    } catch (error) {
-      toast.error('Erro ao fazer login com GitHub.');
-      throw error;
-    }
-  };
-
+  // Função de Logout
   const signOut = async () => {
-    try {
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
-      toast.success('Logout realizado com sucesso!');
-    } catch (error) {
-      toast.error('Erro ao fazer logout.');
-      throw error;
-    }
+    await supabase.auth.signOut();
   };
 
-  const resendVerificationEmail = async () => {
-    try {
-      const { error } = await supabase.auth.resend({
-        type: 'signup',
-        email: user?.email!,
-      });
-
-      if (error) throw error;
-      toast.success('Email de verificação reenviado!');
-    } catch (error) {
-      toast.error('Erro ao reenviar email de verificação.');
-      throw error;
-    }
-  };
-
-  const resetPassword = async (email: string) => {
-    try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/redefinir-senha`,
-      });
-      
-      if (error) throw error;
-      toast.success('Email de redefinição de senha enviado!');
-    } catch (error) {
-      toast.error('Erro ao enviar email de redefinição de senha.');
-      throw error;
-    }
-  };
-
-  const updatePassword = async (newPassword: string) => {
-    try {
-      const { error } = await supabase.auth.updateUser({
-        password: newPassword
-      });
-
-      if (error) throw error;
-      toast.success('Senha atualizada com sucesso!');
-    } catch (error) {
-      toast.error('Erro ao atualizar senha.');
-      throw error;
-    }
+  // Objeto com todos os valores e funções a serem compartilhados
+  const value = {
+    session,
+    user,
+    loading,
+    login, // <-- Adicionado
+    signUp, // <-- Adicionado
+    signOut,
   };
 
   return (
-    <AuthContext.Provider value={{
-      user,
-      loading,
-      signUp,
-      signIn,
-      signInWithGoogle,
-      signInWithGithub,
-      signOut,
-      resendVerificationEmail,
-      resetPassword,
-      updatePassword
-    }}>
-      {children}
+    <AuthContext.Provider value={value}>
+      {!loading && children}
     </AuthContext.Provider>
   );
 };
 
+// Hook customizado para usar o contexto facilmente em outros componentes
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error('useAuth deve ser usado dentro de um AuthProvider');
   }
   return context;
 };

@@ -13,7 +13,7 @@ import { TermsOfService } from './pages/TermsOfService';
 import { Contact } from './pages/Contact';
 import { Login } from './pages/Login';
 import { SignUp } from './pages/SignUp';
-import { Dashboard } from './pages/Dashboard';
+import Dashboard from './pages/Dashboard';
 import { EmailVerification } from './pages/EmailVerification';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './contexts/AuthContext';

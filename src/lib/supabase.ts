@@ -1,40 +1,68 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
+
+// Declare a variável que será exportada
+let supabase: SupabaseClient;
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 console.log('🔧 Configuração Supabase:', {
   url: supabaseUrl ? '✅ Configurado' : '❌ NÃO CONFIGURADO',
-  key: supabaseAnonKey ? '✅ Configurado' : '❌ NÃO CONFIGURADO'
+  key: supabaseAnonKey ? '✅ Configurado' : '❌ NÃO CONFIGURADO',
 });
 
 if (!supabaseUrl || !supabaseAnonKey) {
   console.error('❌ Variáveis de ambiente do Supabase não configuradas!');
-  console.error('VITE_SUPABASE_URL:', supabaseUrl || '[NÃO DEFINIDO]');
-  console.error('VITE_SUPABASE_ANON_KEY:', supabaseAnonKey ? '[CONFIGURADO]' : '[NÃO DEFINIDO]');
-  
-  // Criar um cliente mock para evitar erros
-  export const supabase = {
+
+  // Apenas atribua o objeto mock à variável (sem 'export')
+  supabase = {
     from: () => ({
-      select: () => Promise.resolve({ data: [], error: new Error('Supabase não configurado') }),
-      insert: () => Promise.resolve({ data: [], error: new Error('Supabase não configurado') }),
-      update: () => Promise.resolve({ data: [], error: new Error('Supabase não configurado') }),
-      delete: () => Promise.resolve({ data: [], error: new Error('Supabase não configurado') })
+      select: async () => ({
+        data: [],
+        error: new Error('Supabase não configurado'),
+      }),
+      insert: async () => ({
+        data: [],
+        error: new Error('Supabase não configurado'),
+      }),
+      update: async () => ({
+        data: [],
+        error: new Error('Supabase não configurado'),
+      }),
+      delete: async () => ({
+        data: [],
+        error: new Error('Supabase não configurado'),
+      }),
     }),
     auth: {
-      getSession: () => Promise.resolve({ data: { session: null }, error: null }),
-      onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } })
-    }
+      getSession: async () => ({ data: { session: null }, error: null }),
+      onAuthStateChange: () => ({
+        data: { subscription: { unsubscribe: () => {} } },
+      }),
+    },
   } as any;
 } else {
-  export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+  // Apenas atribua a instância real à variável (sem 'export')
+  supabase = createClient(supabaseUrl, supabaseAnonKey);
 
   // Testar conexão na inicialização
-  supabase.from('plans').select('count').limit(1).then(({ data, error }) => {
-    if (error) {
-      console.error('❌ Erro na conexão inicial com Supabase:', error);
-    } else {
-      console.log('✅ Conexão com Supabase estabelecida com sucesso');
-    }
-  });
+  supabase
+    .from('plans')
+    .select('count', { count: 'exact' })
+    .limit(1)
+    .then(({ error, count }) => {
+      if (error) {
+        console.error(
+          '❌ Erro na conexão inicial com Supabase:',
+          error.message
+        );
+      } else {
+        console.log(
+          `✅ Conexão com Supabase estabelecida com sucesso. Tabela 'plans' encontrada com ${count} registros.`
+        );
+      }
+    });
 }
+
+// Exporte a variável aqui, no final do arquivo
+export { supabase };

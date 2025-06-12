@@ -84,9 +84,9 @@ export class DatabaseService {
       .eq('user_id', userId)
       .eq('status', 'active')
       .gte('current_period_end', new Date().toISOString())
-      .single();
+      .maybeSingle();
 
-    if (error && error.code !== 'PGRST116') {
+    if (error) {
       console.error('Erro ao buscar assinatura:', error);
       throw error;
     }
